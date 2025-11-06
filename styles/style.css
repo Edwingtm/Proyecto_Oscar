@@ -1,0 +1,65 @@
+.registrar{
+    background-color: black;
+}
+
+.h1{
+    text-align: center;
+}
+
+
+body{
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0;
+}
+
+.container{
+    max-width: 90%;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 0 10px rgb(0,0,0,0.1);
+}
+
+#notas-list{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.nota-card{
+    background: #f0f0f0;
+    padding: 10px;
+    border-radius: 5px;
+    width: calc(33.33% - 10px);
+    box-shadow: 0 2px 5px rgb(0,0,0,0.1);
+}
+
+form{
+    display: flex;
+}
+
+img{
+    text-align: center;
+    align-items: center;
+}
+
+.carousel {
+    width: 40%; /* Establece un ancho del 80% */
+    margin: 0 auto; /* Centra el carrusel */
+}
+.carousel-inner img {
+    height: 450px; /* Establece una altura fija para las imágenes */
+    object-fit: cover; /* Ajusta las imágenes para que cubran el área disponible */
+}
+
+.borrar-btn{
+    background-color: red;
+    border-color: black;
+    border-width: 2px;
+}
+
+.borrar-btn:hover{
+    background-color: black;
+}
