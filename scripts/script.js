@@ -1,5 +1,7 @@
 // CONSTANTES Y VARIABLES GLOBALES
-const API_BASE = 'http://localhost:5194/api/';
+//const API_BASE = 'http://localhost:5194/api/';
+const API_BASE = 'http://192.168.1.190:5194/api/'
+
 let isEditing = false;
 let editingReparacionId = null;
 let editingProductId = null;
@@ -443,6 +445,7 @@ async function printRecibo(id) {
                         <hr>
                         <p><strong>Fecha:</strong> ${fecha}</p>
                         <p><strong>Hora:</strong> ${hora}</p>
+                        <p><strong>IMPORTANTE:</strong> Una vez estando listo el equipo cuenta con 8 días para pasar por el y liquidarlo,  de lo contrario el equipo será puesto a la venta para recuperar el costo de la reparación. <p>
                     </div>
                     <div class="footer">
                         ¡Gracias por su preferencia!<br>
