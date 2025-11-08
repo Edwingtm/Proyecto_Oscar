@@ -389,73 +389,559 @@ async function updateReparacionEstado(id, nuevoEstado) {
         showLoading(false);
     }
 }
+// ----------------------------------------------------------------------------------
+
 
 /**
- * Imprime un recibo de reparación
- * @param {number} id - ID de la reparación
+ * Muestra un modal para capturar daños físicos y contraseña
+ */
+function mostrarModalCaptura(reparacion) {
+    return new Promise((resolve, reject) => {
+        // Crear modal
+        const modalHtml = `
+            <div class="modal fade" id="modalCaptura" tabindex="-1" aria-labelledby="modalCapturaLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="modalCapturaLabel">Información del Equipo - ${reparacion.modeloCelular}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="danosFisicos" class="form-label">
+                                            <strong>Daños Físicos Observados:</strong>
+                                        </label>
+                                        <textarea 
+                                            class="form-control" 
+                                            id="danosFisicos" 
+                                            rows="6" 
+                                            placeholder="Describa detalladamente los daños físicos del dispositivo..."
+                                            required
+                                        ></textarea>
+                                        <div class="form-text">
+                                            Ej: Pantalla rota, marco rayado, botones dañados, etc.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="password" class="form-label">
+                                            <strong>Contraseña de Desbloqueo:</strong>
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control" 
+                                            id="password" 
+                                            placeholder="Ingrese la contraseña"
+                                            required
+                                        >
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            <strong>Patrón de Desbloqueo:</strong>
+                                        </label>
+                                        <div class="pattern-grid text-center">
+                                            <div class="pattern-row">
+                                                <button type="button" class="pattern-dot" data-dot="1">1</button>
+                                                <button type="button" class="pattern-dot" data-dot="2">2</button>
+                                                <button type="button" class="pattern-dot" data-dot="3">3</button>
+                                            </div>
+                                            <div class="pattern-row">
+                                                <button type="button" class="pattern-dot" data-dot="4">4</button>
+                                                <button type="button" class="pattern-dot" data-dot="5">5</button>
+                                                <button type="button" class="pattern-dot" data-dot="6">6</button>
+                                            </div>
+                                            <div class="pattern-row">
+                                                <button type="button" class="pattern-dot" data-dot="7">7</button>
+                                                <button type="button" class="pattern-dot" data-dot="8">8</button>
+                                                <button type="button" class="pattern-dot" data-dot="9">9</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">
+                                            Haga clic en los puntos en el orden del patrón
+                                        </div>
+                                        <input type="hidden" id="pattern" value="">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <small>
+                                    <strong>Nota:</strong> Esta información se incluirá en el recibo impreso. 
+                                    Verifique que sea correcta antes de continuar.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-primary" id="btnContinuar">Continuar e Imprimir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Agregar modal al DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // Mostrar modal
+        const modal = new bootstrap.Modal(document.getElementById('modalCaptura'));
+        modal.show();
+
+        // Variables para el patrón
+        let selectedPattern = [];
+
+        // Event listeners para los puntos del patrón
+        document.querySelectorAll('.pattern-dot').forEach(dot => {
+            dot.addEventListener('click', function() {
+                const dotNumber = this.getAttribute('data-dot');
+                if (!selectedPattern.includes(dotNumber)) {
+                    selectedPattern.push(dotNumber);
+                    this.classList.add('active');
+                    document.getElementById('pattern').value = selectedPattern.join('-');
+                }
+            });
+        });
+
+        // Event listener para el botón continuar
+        document.getElementById('btnContinuar').addEventListener('click', function() {
+            const danosFisicos = document.getElementById('danosFisicos').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const pattern = document.getElementById('pattern').value;
+
+            if (!danosFisicos) {
+                showAlert('Por favor, describa los daños físicos del equipo', 'warning');
+                return;
+            }
+
+            if (!password && !pattern) {
+                showAlert('Por favor, ingrese la contraseña o seleccione el patrón de desbloqueo', 'warning');
+                return;
+            }
+
+            // Cerrar modal y resolver la promesa
+            modal.hide();
+            setTimeout(() => {
+                document.getElementById('modalCaptura').remove();
+                resolve({
+                    danosFisicos: danosFisicos,
+                    password: password,
+                    pattern: pattern
+                });
+            }, 300);
+        });
+
+        // Limpiar cuando se cierre el modal
+        document.getElementById('modalCaptura').addEventListener('hidden.bs.modal', function() {
+            this.remove();
+            reject(new Error('Modal cerrado por el usuario'));
+        });
+    });
+}
+
+/**
+ * Función principal actualizada para imprimir recibo
  */
 async function printRecibo(id) {
     try {
-        showLoading(true, 'Generando recibo...');
+        showLoading(true, 'Cargando información de la reparación...');
         
         const response = await fetch(API_BASE + `Reparacion/${id}`);
         if (!response.ok) throw new Error('Error al obtener la reparación');
-        
         const reparacion = await response.json();
+        
+        showLoading(false);
+        
+        // Mostrar modal para capturar información
+        const { danosFisicos, password, pattern } = await mostrarModalCaptura(reparacion);
+        
+        // Generar recibo con la información capturada
+        await generarRecibo(reparacion, danosFisicos, password, pattern);
+        
+    } catch (error) {
+        if (error.message !== 'Modal cerrado por el usuario') {
+            console.error('Error al generar recibo:', error);
+            showAlert('Error al generar el recibo', 'danger');
+        }
+        showLoading(false);
+    }
+}
+
+/**
+ * Función para generar el recibo con la información capturada
+ */
+async function generarRecibo(reparacion, danosFisicos, password, pattern) {
+    try {
+        showLoading(true, 'Generando recibo...');
         
         const fechaActual = new Date();
         const fecha = fechaActual.toLocaleDateString();
         const hora = fechaActual.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         
+        // Generar representación visual del patrón si existe
+        let patternVisual = '';
+        if (pattern) {
+            const patternNumbers = pattern.split('-');
+            patternVisual = `Patrón: ${patternNumbers.join(' → ')}`;
+        }
+
         const reciboHtml = `
             <!DOCTYPE html>
             <html>
             <head>
                 <title>Recibo de Reparación #${reparacion.id}</title>
                 <style>
-                    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-                    .recibo { max-width: 300px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; }
-                    .header { text-align: center; margin-bottom: 20px; }
-                    .logo { max-width: 80px; margin-bottom: 10px; }
-                    .title { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-                    .info { margin-bottom: 15px; }
-                    .info p { margin: 5px 0; }
-                    .total { font-weight: bold; margin-top: 10px; }
-                    .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
-                    hr { border-top: 1px dashed #ddd; margin: 15px 0; }
+                    @page {
+                        size: A4;
+                        margin: 0.5in;
+                    }
+                    body { 
+                        font-family: Arial, sans-serif; 
+                        margin: 0; 
+                        padding: 0;
+                        width: 210mm;
+                        height: 297mm;
+                        box-sizing: border-box;
+                    }
+                    .recibo { 
+                        width: 100%;
+                        height: 100%;
+                        padding: 15mm;
+                        box-sizing: border-box;
+                        border: 1px solid #ddd;
+                        position: relative;
+                    }
+                    .header { 
+                        text-align: center; 
+                        margin-bottom: 15px;
+                        border-bottom: 2px solid #333;
+                        padding-bottom: 8px;
+                    }
+                    .title { 
+                        font-size: 22px; 
+                        font-weight: bold; 
+                        margin-bottom: 3px; 
+                    }
+                    .subtitle {
+                        font-size: 16px;
+                        margin-bottom: 8px;
+                    }
+                    .info-section {
+                        display: flex;
+                        gap: 15px;
+                        margin-bottom: 15px;
+                    }
+                    .client-info {
+                        flex: 1;
+                        border: 1px solid #ddd;
+                        padding: 12px;
+                        background: #f9f9f9;
+                        font-size: 12px;
+                    }
+                    .damage-info {
+                        flex: 1;
+                        border: 1px solid #ddd;
+                        padding: 12px;
+                        background: #f9f9f9;
+                    }
+                    .info p {
+                        margin: 4px 0;
+                        line-height: 1.2;
+                    }
+                    .total {
+                        font-weight: bold;
+                        margin-top: 8px;
+                    }
+                    .footer { 
+                        text-align: center; 
+                        margin: 15px 0;
+                        font-size: 11px; 
+                        color: #666;
+                    }
+                    hr { 
+                        border-top: 1px dashed #ddd; 
+                        margin: 10px 0; 
+                    }
+                    .phone-diagram {
+                        text-align: center;
+                    }
+                    .phone-diagram img {
+                        max-width: 100%;
+                        height: auto;
+                    }
+                    .damage-notes {
+                        margin-top: 8px;
+                        font-size: 10px;
+                    }
+                    .damage-text {
+                        border: 1px solid #ddd;
+                        padding: 8px;
+                        background: white;
+                        min-height: 50px;
+                        font-size: 10px;
+                        line-height: 1.3;
+                    }
+                    .policies {
+                        border: 1px solid #ddd;
+                        padding: 12px;
+                        background: #f9f9f9;
+                        margin-bottom: 15px;
+                        font-size: 9px;
+                    }
+                    .policies h3 {
+                        font-size: 11px;
+                        margin-bottom: 8px;
+                        border-bottom: 1px solid #ddd;
+                        padding-bottom: 4px;
+                        text-align: center;
+                    }
+                    .policies-columns {
+                        display: flex;
+                        gap: 12px;
+                    }
+                    .policy-column {
+                        flex: 1;
+                    }
+                    .policies h4 {
+                        font-size: 10px;
+                        margin: 6px 0 3px 0;
+                        color: #333;
+                    }
+                    .policies ul {
+                        padding-left: 12px;
+                        margin: 2px 0 6px 0;
+                    }
+                    .policies li {
+                        margin-bottom: 2px;
+                        line-height: 1.2;
+                    }
+                    
+                    /* Estilos para el espacio recortable */
+                    .cutout-section {
+                        border-top: 2px dashed #000;
+                        padding: 8px;
+                        background: #f0f0f0;
+                        margin-top: 10px;
+                    }
+                    .cutout-content {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: flex-start;
+                    }
+                    .cutout-info {
+                        text-align: left;
+                        font-size: 12px;
+                        font-weight: bold;
+                        flex: 1;
+                    }
+                    .cutout-unlock {
+                        flex: 1;
+                        text-align: center;
+                    }
+                    .pattern-container {
+                        display: inline-block;
+                        margin: 5px 0;
+                    }
+                    .pattern-image img {
+                        width: 80px;
+                        height: 80px;
+                        border: 2px solid #333;
+                        background-color: white;
+                    }
+                    .password-field {
+                        margin-top: 5px;
+                    }
+                    .password-display {
+                        font-size: 10px;
+                        margin: 3px 0;
+                        padding: 2px 5px;
+                        background: white;
+                        border: 1px solid #ddd;
+                        display: inline-block;
+                    }
+                    .cutout-signature {
+                        flex: 1;
+                        text-align: center;
+                    }
+                    .cutout-signature-line {
+                        width: 120px;
+                        border-bottom: 1px solid #000;
+                        margin: 8px auto 3px auto;
+                    }
+                    .cutout-instruction {
+                        font-size: 9px;
+                        color: #666;
+                        margin-top: 3px;
+                        font-style: italic;
+                        text-align: center;
+                    }
+                    .section-title {
+                        font-size: 11px;
+                        font-weight: bold;
+                        margin: 8px 0 4px 0;
+                        color: #333;
+                    }
+                    
+                    .print-only {
+                        display: block;
+                    }
+                    @media screen {
+                        body {
+                            margin: 20px auto;
+                            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                        }
+                        .cutout-section {
+                            background-color: #f9f9f9;
+                        }
+                    }
+                    @media print {
+                        .cutout-section {
+                            border: 2px dashed #000 !important;
+                            page-break-inside: avoid;
+                        }
+                    }
                 </style>
             </head>
             <body>
                 <div class="recibo">
                     <div class="header">
                         <div class="title">DLTEC</div>
-                        <div>Recibo de Reparación</div>
+                        <div class="subtitle">Recibo de Reparación</div>
                     </div>
-                    <div class="info">
-                        <p><strong>ID:</strong> ${reparacion.id}</p>
-                        <p><strong>Cliente:</strong> ${reparacion.nombre}</p>
-                        <p><strong>Teléfono:</strong> ${reparacion.telefono}</p>
-                        <p><strong>Modelo:</strong> ${reparacion.modeloCelular}</p>
-                        <p><strong>Problema:</strong> ${reparacion.problema}</p>
-                        <hr>
-                        <p><strong>Costo:</strong> $${reparacion.costo.toFixed(2)}</p>
-                        <p><strong>Anticipo:</strong> $${reparacion.anticipo.toFixed(2)}</p>
-                        <p class="total"><strong>Restante:</strong> $${reparacion.restante.toFixed(2)}</p>
-                        <p><strong>Estado:</strong> ${reparacion.estado}</p>
-                        <hr>
-                        <p><strong>Fecha:</strong> ${fecha}</p>
-                        <p><strong>Hora:</strong> ${hora}</p>
-                        <p><strong>IMPORTANTE:</strong> Una vez estando listo el equipo cuenta con 8 días para pasar por el y liquidarlo,  de lo contrario el equipo será puesto a la venta para recuperar el costo de la reparación. <p>
+                    
+                    <div class="info-section">
+                        <div class="client-info">
+                            <div class="info">
+                                <p><strong>ID:</strong> ${reparacion.id}</p>
+                                <p><strong>Cliente:</strong> ${reparacion.nombre}</p>
+                                <p><strong>Teléfono:</strong> ${reparacion.telefono}</p>
+                                <p><strong>Modelo:</strong> ${reparacion.modeloCelular}</p>
+                                <p><strong>Problema:</strong> ${reparacion.problema}</p>
+                                <hr>
+                                <p><strong>Costo:</strong> $${reparacion.costo.toFixed(2)}</p>
+                                <p><strong>Anticipo:</strong> $${reparacion.anticipo.toFixed(2)}</p>
+                                <p class="total"><strong>Restante:</strong> $${reparacion.restante.toFixed(2)}</p>
+                                <p><strong>Estado:</strong> ${reparacion.estado}</p>
+                                <hr>
+                                <p><strong>Fecha:</strong> ${fecha}</p>
+                                <p><strong>Hora:</strong> ${hora}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="damage-info">
+                            <div class="phone-diagram">
+                                <p class="section-title">Diagrama para marcar daños físicos:</p>
+                                <img src="img/DiagramaCelular.png" alt="Diagrama de celular 360°">
+                                <div class="damage-notes">
+                                    <p class="section-title">Notas sobre daños físicos:</p>
+                                    <div class="damage-text">${danosFisicos}</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <div class="policies">
+                        <h3>POLÍTICAS DE REPARACIÓN</h3>
+                        <div class="policies-columns">
+                            <div class="policy-column">
+                                <h4>1. Garantía</h4>
+                                <ul>
+                                    <li>Todas las reparaciones cuentan con garantía únicamente sobre la pieza o servicio reemplazado.</li>
+                                    <li>La garantía no cubre daños ocasionados por:
+                                        <ul>
+                                            <li>Golpes, caídas o humedad.</li>
+                                            <li>Manipulación por terceros después de la reparación.</li>
+                                            <li>Mal uso o accesorios defectuosos.</li>
+                                        </ul>
+                                    </li>
+                                    <li>Tiempo de garantía: 30 días.</li>
+                                </ul>
+                                
+                                <h4>2. Piezas y Componentes</h4>
+                                <ul>
+                                    <li>El cliente puede elegir entre piezas originales, OEM o genéricas, sujeto a disponibilidad.</li>
+                                    <li>Las piezas genéricas pueden presentar variaciones en brillo, color y sensibilidad, lo cual el cliente acepta al solicitar dicha opción.</li>
+                                </ul>
+                                
+                                <h4>3. Equipos con Golpe o Humedad</h4>
+                                <ul>
+                                    <li>Equipos con daño por humedad o golpe no tienen garantía, incluso si la pieza nueva falla posteriormente.</li>
+                                    <li>La intervención en equipos mojados es una recuperación tentativa, no un resultado garantizado.</li>
+                                </ul>
+                            </div>
+                            <div class="policy-column">
+                                <h4>4. Tiempos de Entrega</h4>
+                                <ul>
+                                    <li>El tiempo de reparación puede variar según disponibilidad de piezas y nivel de daño interno.</li>
+                                    <li>Se avisará al cliente si se requiere más tiempo o piezas adicionales.</li>
+                                </ul>
+                                
+                                <h4>5. Abonos y Pagos</h4>
+                                <ul>
+                                    <li>Se puede solicitar anticipo en reparaciones que requieran compra de piezas.</li>
+                                    <li>El pago completo se realiza al momento de la entrega del equipo.</li>
+                                </ul>
+                                
+                                <h4>6. Equipos No Reclamados</h4>
+                                <ul>
+                                    <li>Equipos no reclamados en 15 días se considerarán abandonados y podrán ser usados para cubrir costos o almacenaje.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="footer">
                         ¡Gracias por su preferencia!<br>
                         Tel: 395-123-22-11
                     </div>
+                    
+                    <!-- Sección recortable -->
+                    <div class="cutout-section">
+                        <div class="cutout-content">
+                            <div class="cutout-info">
+                                <p>ID: ${reparacion.id}</p>
+                                <p>Cliente: ${reparacion.nombre}</p>
+                                <p>Fecha: ${fecha}</p>
+                                <p>Hora: ${hora}</p>
+                            </div>
+                            
+                            <div class="cutout-unlock">
+                                <p class="section-title">Información de Desbloqueo</p>
+                                <div class="pattern-container">
+                                    <div class="pattern-image">
+                                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iODAiIHZpZXdCb3g9IjAgMCA4MCA4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjIwIiByPSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNDAiIGN5PSIyMCIgcj0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjQwIiByPSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNDAiIGN5PSI0MCIgcj0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNDAiIHI9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjYwIiByPSI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGNpcmNsZSBjeD0iNDAiIGN5PSI2MCIgcj0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxjaXJjbGUgY3g9IjYwIiBjeT0iNjAiIHI9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzMzMyIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48L3N2Zz4=" alt="Patrón de 9 puntos">
+                                    </div>
+                                </div>
+                                <div class="password-field">
+                                    ${password ? `
+                                        <div class="password-display">
+                                            <strong>Contraseña:</strong> ${password}
+                                        </div>
+                                    ` : ''}
+                                    ${pattern ? `
+                                        <div class="password-display">
+                                            <strong>${patternVisual}</strong>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="cutout-signature">
+                                <p>Firma del cliente:</p>
+                            </div>
+                        </div>
+                        <div class="cutout-instruction">
+                            ★ RECORTAR POR ESTA LÍNEA PUNTEADA ★
+                        </div>
+                    </div>
                 </div>
             </body>
             </html>`;
-        
-        const ventana = window.open('', '_blank', 'width=400,height=600');
+
+        const ventana = window.open('', '_blank', 'width=794,height=1123');
         ventana.document.write(reciboHtml);
         ventana.document.close();
         
@@ -463,14 +949,16 @@ async function printRecibo(id) {
             ventana.print();
             showLoading(false);
         };
+        
     } catch (error) {
         console.error('Error al generar recibo:', error);
         showAlert('Error al generar el recibo', 'danger');
         showLoading(false);
-    } finally {
-        showLoading(false); // Esto debe estar presente en todas las funciones async
     }
 }
+
+
+// --------------------------------------------------------
 
 /**
  * Confirma la eliminación de una reparación
